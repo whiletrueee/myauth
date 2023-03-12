@@ -8,11 +8,11 @@ export const userLogin = async (email: string, password: string) => {
   const collection = db.collection("users");
   const trueCred = await collection.findOne({ email });
   if (!trueCred) {
-    throw new Error("User not found");
+    throw { statusCode: 404, message: "User not found" };
   } else {
     const compare = await bcrypt.compare(password, trueCred.password);
     if (!compare) {
-      throw new Error("Invalid password");
+      throw { statusCode: 401, message: "Invalid password" };
     }
     return trueCred;
   }
@@ -31,7 +31,10 @@ export const userRegister = async (data: {
   });
 
   if (alreadyRegisterd) {
-    throw new Error("User already registerd");
+    throw {
+      statusCode: 409,
+      message: "User already registerd",
+    };
   } else {
     const count = await collection.findOne({
       _id: new ObjectId("64080a8a5fe4b12b34e428f2"),
@@ -60,7 +63,10 @@ export const userRegister = async (data: {
     );
 
     if (!inserted) {
-      throw new Error("User not inserted");
+      throw {
+        statusCode: 500,
+        message: "Unable to insert user",
+      };
     } else {
       return { message: "Successfully registerd", auth: true };
     }
@@ -72,7 +78,7 @@ export const getUser = async (username: string) => {
   const collection = db.collection("users");
   const finduser = await collection.findOne({ username });
   if (!finduser) {
-    throw new Error("User not found");
+    throw { statusCode: 404, message: "User not found" };
   } else {
     return finduser;
   }
