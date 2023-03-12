@@ -1,37 +1,79 @@
-import { Db } from "mongodb";
+import { getDB } from "../config/database";
+import bcrypt from "bcrypt";
+import { ObjectId } from "mongodb";
+import { generateUsername } from "../utils/generateUsername";
 
-export interface User {
-  uniqueId?: string;
+export const userLogin = async (email: string, password: string) => {
+  const db = await getDB();
+  const collection = db.collection("users");
+  const trueCred = await collection.findOne({ email });
+  if (!trueCred) {
+    throw new Error("User not found");
+  } else {
+    const compare = await bcrypt.compare(password, trueCred.password);
+    if (!compare) {
+      throw new Error("Invalid password");
+    }
+    return trueCred;
+  }
+};
+
+export const userRegister = async (data: {
   name: string;
   email: string;
   password: string;
-  username?: string;
-}
+}) => {
+  const db = await getDB();
+  const collection = db.collection("users");
 
-export class userModel {
-  private readonly database: Db;
-  private readonly collectionName = "users";
+  const alreadyRegisterd = await collection.findOne({
+    email: data.email,
+  });
 
-  constructor(database: Db) {
-    this.database = database;
-  }
+  if (alreadyRegisterd) {
+    throw new Error("User already registerd");
+  } else {
+    const count = await collection.findOne({
+      _id: new ObjectId("64080a8a5fe4b12b34e428f2"),
+    });
 
-  async createUser(user: User) {
-    const collection = this.database.collection<User>(this.collectionName);
-    try {
-      await collection.insertOne(user);
-    } catch (err: any) {
-      throw new Error(`Error creating user ${err.message}`);
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(data.password, salt);
+
+    const dbUser = {
+      name: data.name,
+      email: data.email,
+      password: hash,
+      username: generateUsername(data.name) + count?.count,
+    };
+
+    const inserted = await collection.insertOne(dbUser);
+
+    await collection.updateOne(
+      { _id: new ObjectId("64080a8a5fe4b12b34e428f2") },
+      {
+        $set: {
+          count: count?.count + 1,
+        },
+      },
+      { upsert: false }
+    );
+
+    if (!inserted) {
+      throw new Error("User not inserted");
+    } else {
+      return { message: "Successfully registerd", auth: true };
     }
   }
+};
 
-  async getUsers(email: string) {
-    const collection = this.database.collection<User>(this.collectionName);
-    try {
-      const result = await collection.find({ email });
-      return result.toArray() ?? null;
-    } catch (err: any) {
-      throw new Error(`Error getting user ${err.message}`);
-    }
+export const getUser = async (username: string) => {
+  const db = await getDB();
+  const collection = db.collection("users");
+  const finduser = await collection.findOne({ username });
+  if (!finduser) {
+    throw new Error("User not found");
+  } else {
+    return finduser;
   }
-}
+};

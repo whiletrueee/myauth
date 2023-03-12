@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import { config } from "dotenv";
-import { getDB } from "../config/database";
-import { ObjectId } from "mongodb";
 import { z } from "zod";
+import jwt from "jsonwebtoken";
+import { userLogin } from "../models/user";
 config();
 
 export const loginUser = async (req: Request, res: Response) => {
@@ -10,25 +10,25 @@ export const loginUser = async (req: Request, res: Response) => {
     email: z.string(),
     password: z.string().min(6),
   });
-  console.log(req.body);
-  let user = loginSchema.parse(req.body);
+  let user = loginSchema.safeParse(req.body);
 
   try {
-    const db = await getDB();
-    const collection = db.collection("users");
-
-    const trueCred = await collection.findOne({ email: user.email });
-
-    if (!trueCred) {
-      return res.send("User not found").status(404);
-    } else {
-      if (trueCred.password !== user.password) {
-        return res.send("Wrong password").status(404);
-      }
+    if (!user.success) {
+      throw new Error("Invalid data");
     }
 
-    res.send("login successfull").status(200);
+    const getUser = await userLogin(user.data.email, user.data.password);
+
+    const secret = process.env.SECRET_KEY!;
+    const token = jwt.sign({ username: getUser.username }, secret, {
+      expiresIn: 86400, // expires in 24 hours
+    });
+
+    res
+      .status(200)
+      .json({ message: "Successfully logged in", auth: true, token });
   } catch (err: any) {
+    res.status(err.status ?? 500).json({ message: err.message, auth: false });
     console.log(err);
   }
 };
