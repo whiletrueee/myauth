@@ -36,65 +36,106 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.registerUser = void 0;
+exports.me = exports.loginUser = exports.registerUser = void 0;
 var dotenv_1 = require("dotenv");
-var database_1 = require("../config/database");
-var mongodb_1 = require("mongodb");
-var zod_1 = require("zod");
+var user_1 = require("../services/user");
+var user_2 = require("../services/user");
+var userSchema_1 = require("../utils/userSchema");
+var jwt_1 = require("../utils/jwt");
 (0, dotenv_1.config)();
 var registerUser = function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-    var userSchema, user, db, collection, count, username, userData, _a;
-    var _b;
+    var userdata, signup, err_1;
+    var _a, _b;
     return __generator(this, function (_c) {
         switch (_c.label) {
             case 0:
-                userSchema = zod_1.z.object({
-                    name: zod_1.z.string(),
-                    email: zod_1.z.string(),
-                    password: zod_1.z.string().min(6),
-                });
-                user = userSchema.parse(req.body);
+                userdata = userSchema_1.registerSchema.safeParse(req.body);
                 _c.label = 1;
             case 1:
-                _c.trys.push([1, 6, 7, 8]);
-                return [4 /*yield*/, (0, database_1.getDB)()];
+                _c.trys.push([1, 3, , 4]);
+                if (!userdata.success) {
+                    throw { statusCode: 400, message: "Invalid data provided" };
+                }
+                return [4 /*yield*/, (0, user_1.userRegister)(userdata.data)];
             case 2:
-                db = _c.sent();
-                collection = db.collection("users");
-                return [4 /*yield*/, collection.findOne({
-                        _id: new mongodb_1.ObjectId("64080a8a5fe4b12b34e428f2"),
-                    })];
+                signup = _c.sent();
+                res.status(200).json(signup);
+                return [3 /*break*/, 4];
             case 3:
-                count = _c.sent();
-                username = ((_b = user.name.split(" ")[0].slice(0, 1) +
-                    user.name.split(" ")[1].slice(0, 1)) !== null && _b !== void 0 ? _b : user.name.split(" ")[0].slice(1, 2)) + (count === null || count === void 0 ? void 0 : count.count);
-                userData = {
-                    name: user.name,
-                    email: user.email,
-                    password: user.password,
-                    username: username,
-                };
-                return [4 /*yield*/, collection.insertOne(userData)];
-            case 4:
-                _c.sent();
-                return [4 /*yield*/, collection.updateOne({ _id: new mongodb_1.ObjectId("64080a8a5fe4b12b34e428f2") }, {
-                        $set: {
-                            count: (count === null || count === void 0 ? void 0 : count.count) + 1,
-                        },
-                    }, { upsert: false })];
-            case 5:
-                _c.sent();
-                res.send("ok").status(200);
-                return [3 /*break*/, 8];
-            case 6:
-                _a = _c.sent();
-                console.log("Error connecting to database");
-                return [3 /*break*/, 8];
-            case 7:
-                (0, database_1.closeDB)();
-                return [7 /*endfinally*/];
-            case 8: return [2 /*return*/];
+                err_1 = _c.sent();
+                res.status((_a = err_1.statusCode) !== null && _a !== void 0 ? _a : 500).json({
+                    auth: false,
+                    message: (_b = err_1.message) !== null && _b !== void 0 ? _b : "Internal Server Error",
+                });
+                console.log(err_1);
+                return [3 /*break*/, 4];
+            case 4: return [2 /*return*/];
         }
     });
 }); };
 exports.registerUser = registerUser;
+var loginUser = function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+    var user, getUser_1, token, err_2;
+    var _a;
+    return __generator(this, function (_b) {
+        switch (_b.label) {
+            case 0:
+                user = userSchema_1.loginSchema.safeParse(req.body);
+                _b.label = 1;
+            case 1:
+                _b.trys.push([1, 3, , 4]);
+                if (!user.success) {
+                    throw { statusCode: 400, message: "Invalid data provided" };
+                }
+                return [4 /*yield*/, (0, user_1.userLogin)(user.data.email, user.data.password)];
+            case 2:
+                getUser_1 = _b.sent();
+                token = (0, jwt_1.loginToken)(getUser_1.username);
+                res
+                    .status(200)
+                    .json({ message: "Successfully logged in", auth: true, token: token });
+                return [3 /*break*/, 4];
+            case 3:
+                err_2 = _b.sent();
+                res.status((_a = err_2.status) !== null && _a !== void 0 ? _a : 500).json({ message: err_2.message, auth: false });
+                console.log(err_2);
+                return [3 /*break*/, 4];
+            case 4: return [2 /*return*/];
+        }
+    });
+}); };
+exports.loginUser = loginUser;
+var me = function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+    var verify, user, err_3;
+    var _a;
+    return __generator(this, function (_b) {
+        switch (_b.label) {
+            case 0:
+                _b.trys.push([0, 4, , 5]);
+                verify = (0, jwt_1.verifyToken)(req.headers.authorization);
+                if (!!verify) return [3 /*break*/, 1];
+                throw { status: 401, message: "Invalid token" };
+            case 1: return [4 /*yield*/, (0, user_2.getUser)(verify.username)];
+            case 2:
+                user = _b.sent();
+                res
+                    .status(200)
+                    .json({
+                    message: "true user",
+                    auth: true,
+                    user: { name: user.name, email: user.email, username: user.username },
+                });
+                _b.label = 3;
+            case 3: return [3 /*break*/, 5];
+            case 4:
+                err_3 = _b.sent();
+                res
+                    .status((_a = err_3.status) !== null && _a !== void 0 ? _a : 500)
+                    .json({ message: err_3.message, success: false });
+                console.log(err_3);
+                return [3 /*break*/, 5];
+            case 5: return [2 /*return*/];
+        }
+    });
+}); };
+exports.me = me;
