@@ -9,4 +9,5 @@ var router = express_1.default.Router();
 router.post("/register", user_1.registerUser);
 router.post("/login", user_1.loginUser);
 router.get("/me", user_1.me);
+router.get("/hello", function (req, res) { return res.send("Hello World!"); });
 module.exports = router;
